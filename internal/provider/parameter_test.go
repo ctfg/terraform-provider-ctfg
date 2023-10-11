@@ -15,25 +15,14 @@ func TestAccParameter(t *testing.T) {
 			{
 				Config: `
 				resource "ctfg_parameter" "parameter" {
-				  name = "example"
+				  id = "example"
 				  value = "example"
 				}
 				`,
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("ctfg_parameter.parameter", "name", "example"),
+					resource.TestCheckResourceAttr("ctfg_parameter.parameter", "id", "example"),
 					resource.TestCheckResourceAttr("ctfg_parameter.parameter", "value", "example"),
 				),
-			},
-			// ImportState testing
-			{
-				ResourceName:      "scaffolding_example.test",
-				ImportState:       true,
-				ImportStateVerify: true,
-				// This is not normally necessary, but is here because this
-				// example code does not have an actual upstream service.
-				// Once the Read method is able to refresh information from
-				// the upstream service, this can be removed.
-				ImportStateVerifyIgnore: []string{"configurable_attribute", "defaulted"},
 			},
 			// Delete testing automatically occurs in TestCase
 		},

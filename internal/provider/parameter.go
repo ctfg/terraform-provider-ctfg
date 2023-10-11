@@ -17,7 +17,7 @@ import (
 )
 
 type Option struct {
-	Name        types.String `tfsdk:"name"`
+	DisplayName types.String `tfsdk:"display_name"`
 	Description types.String `tfsdk:"description"`
 	Value       types.String `tfsdk:"value"`
 	Icon        types.String `tfsdk:"icon"`
@@ -34,7 +34,7 @@ type ParameterResource struct {
 
 type Parameter struct {
 	Value       types.String `tfsdk:"value"`
-	Name        types.String `tfsdk:"name"`
+	ID          types.String `tfsdk:"id"`
 	DisplayName types.String `tfsdk:"display_name"`
 	Description types.String `tfsdk:"description"`
 	Type        types.String `tfsdk:"type"`
@@ -51,8 +51,8 @@ func (p *ParameterResource) Schema(ctx context.Context, req resource.SchemaReque
 	resp.Schema = schema.Schema{
 		MarkdownDescription: "Use this data source to configure editable options for workspaces.",
 		Attributes: map[string]schema.Attribute{
-			"name": schema.StringAttribute{
-				MarkdownDescription: "Name of the parameter",
+			"id": schema.StringAttribute{
+				MarkdownDescription: "ID of the parameter",
 				Required:            true,
 			},
 			"value": schema.StringAttribute{
@@ -85,7 +85,7 @@ func (p *ParameterResource) Schema(ctx context.Context, req resource.SchemaReque
 				Optional:            true,
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
-						"name": schema.StringAttribute{
+						"display_name": schema.StringAttribute{
 							MarkdownDescription: "Name of the option",
 							Required:            true,
 						},
@@ -177,12 +177,12 @@ func (p *ParameterResource) verifyParameter(ctx context.Context, parameter *Para
 		for _, optionObj := range options {
 			var option Option
 			diagnostics.Append(optionObj.As(ctx, &option, basetypes.ObjectAsOptions{})...)
-			_, exists := names[option.Name.ValueString()]
+			_, exists := names[option.DisplayName.ValueString()]
 			if exists {
-				diagnostics.Append(diag.NewErrorDiagnostic(fmt.Errorf("multiple options cannot have the same name %q", option.Name.ValueString()).Error(), ""))
+				diagnostics.Append(diag.NewErrorDiagnostic(fmt.Errorf("multiple options cannot have the same name %q", option.DisplayName.ValueString()).Error(), ""))
 			}
 			diagnostics.Append(valueIsType(parameter.Type.ValueString(), option.Value.ValueString()))
-			names[option.Name.ValueString()] = nil
+			names[option.DisplayName.ValueString()] = nil
 
 			if option.Value.ValueString() == parameter.Value.ValueString() {
 				valid = true
