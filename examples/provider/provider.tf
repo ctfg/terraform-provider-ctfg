@@ -1,3 +1,10 @@
-provider "scaffolding" {
-  # example configuration here
+terraform {
+  required_providers {
+    ctfg = {
+      source = "ctfg/ctfg"
+    }
+  }
+}
+
+provider "ctfg" {
 }
