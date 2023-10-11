@@ -17,7 +17,7 @@ Use this data source to configure editable options for workspaces.
 
 ### Required
 
-- `name` (String) Name of the parameter
+- `id` (String) ID of the parameter
 - `value` (String) Value of the parameter
 
 ### Optional
@@ -36,7 +36,7 @@ Use this data source to configure editable options for workspaces.
 
 Required:
 
-- `name` (String) Name of the option
+- `display_name` (String) Name of the option
 - `value` (String) Value of the option
 
 Optional:
