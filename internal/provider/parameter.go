@@ -2,15 +2,12 @@ package provider
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"strconv"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
@@ -43,6 +40,30 @@ type Parameter struct {
 	Optional    types.Bool   `tfsdk:"optional"`
 }
 
+func (p *Parameter) GetOptions(ctx context.Context) ([]Option, diag.Diagnostics) {
+	var diagnostics diag.Diagnostics
+
+	optionObjects := make([]types.Object, 0, len(p.Options.Elements()))
+	options := make([]Option, 0, len(p.Options.Elements()))
+
+	diagnostics.Append(p.Options.ElementsAs(ctx, &optionObjects, false)...)
+
+	if len(optionObjects) > 0 {
+		valid := false
+
+		for idx, optionObj := range optionObjects {
+			diagnostics.Append(optionObj.As(ctx, &options[idx], basetypes.ObjectAsOptions{})...)
+		}
+
+		if !valid {
+			diagnostics.Append(diag.NewErrorDiagnostic(fmt.Errorf("value %q is not a valid option", p.Value.ValueString()).Error(), ""))
+			return nil, diagnostics
+		}
+	}
+
+	return options, diagnostics
+}
+
 func (p *ParameterResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
 	resp.TypeName = req.ProviderTypeName + "_parameter"
 }
@@ -58,6 +79,9 @@ func (p *ParameterResource) Schema(ctx context.Context, req resource.SchemaReque
 			"value": schema.StringAttribute{
 				MarkdownDescription: "Value of the parameter",
 				Required:            true,
+				Validators: []validator.String{
+					parameterValueValidator(),
+				},
 			},
 			"display_name": schema.StringAttribute{
 				MarkdownDescription: "Display name of the parameter",
@@ -69,15 +93,13 @@ func (p *ParameterResource) Schema(ctx context.Context, req resource.SchemaReque
 			},
 			"type": schema.StringAttribute{
 				MarkdownDescription: "Type of the parameter",
-				Optional:            true,
-				Computed:            true,
-				Default:             stringdefault.StaticString("string"),
+				Required:            true,
 				Validators: []validator.String{
 					stringvalidator.OneOf("number", "string", "bool", "json"),
 				},
 			},
 			"icon": schema.StringAttribute{
-				MarkdownDescription: "Icon of the parameter, see in https://tabler-icons.io/ \n\n e.g. `database`",
+				MarkdownDescription: "Icon of the parameter, see in https://tabler-icons.io/  \n   e.g. `database`",
 				Optional:            true,
 			},
 			"options": schema.ListNestedAttribute{
@@ -98,7 +120,7 @@ func (p *ParameterResource) Schema(ctx context.Context, req resource.SchemaReque
 							Required:            true,
 						},
 						"icon": schema.StringAttribute{
-							MarkdownDescription: "Icon of the option, see in https://tabler-icons.io/ \n\n e.g. `database`",
+							MarkdownDescription: "Icon of the option, see in https://tabler-icons.io/  \n   e.g. `database`",
 							Optional:            true,
 						},
 					},
@@ -124,8 +146,6 @@ func (p *ParameterResource) Create(ctx context.Context, req resource.CreateReque
 		return
 	}
 
-	resp.Diagnostics.Append(p.verifyParameter(ctx, &parameter)...)
-
 	resp.Diagnostics.Append(resp.State.Set(ctx, &parameter)...)
 }
 
@@ -141,8 +161,6 @@ func (p *ParameterResource) Update(ctx context.Context, req resource.UpdateReque
 		return
 	}
 
-	resp.Diagnostics.Append(p.verifyParameter(ctx, &parameter)...)
-
 	resp.Diagnostics.Append(resp.State.Set(ctx, &parameter)...)
 }
 
@@ -156,74 +174,4 @@ func (p *ParameterResource) Read(ctx context.Context, req resource.ReadRequest, 
 	}
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &parameter)...)
-}
-
-func (p *ParameterResource) verifyParameter(ctx context.Context, parameter *Parameter) (diagnostics diag.Diagnostics) {
-	value := parameter.Value.ValueString()
-
-	diagnostics.Append(valueIsType(parameter.Type.ValueString(), value))
-	if diagnostics.HasError() {
-		return
-	}
-
-	options := make([]types.Object, 0, len(parameter.Options.Elements()))
-
-	diagnostics.Append(parameter.Options.ElementsAs(ctx, &options, false)...)
-
-	if len(options) > 0 {
-		names := map[string]interface{}{}
-		valid := false
-
-		for _, optionObj := range options {
-			var option Option
-			diagnostics.Append(optionObj.As(ctx, &option, basetypes.ObjectAsOptions{})...)
-			_, exists := names[option.DisplayName.ValueString()]
-			if exists {
-				diagnostics.Append(diag.NewErrorDiagnostic(fmt.Errorf("multiple options cannot have the same name %q", option.DisplayName.ValueString()).Error(), ""))
-			}
-			diagnostics.Append(valueIsType(parameter.Type.ValueString(), option.Value.ValueString()))
-			names[option.DisplayName.ValueString()] = nil
-
-			if option.Value.ValueString() == parameter.Value.ValueString() {
-				valid = true
-			}
-		}
-
-		if !valid {
-			diagnostics.Append(diag.NewErrorDiagnostic(fmt.Errorf("value %q is not a valid option", parameter.Value.ValueString()).Error(), ""))
-			return
-		}
-	}
-
-	if !parameter.Optional.ValueBool() && parameter.Value.ValueString() == "" {
-		diagnostics.Append(diag.NewErrorDiagnostic("Parameter is optional and not set", ""))
-	}
-
-	return
-}
-
-func valueIsType(typ, value string) diag.Diagnostic {
-	switch typ {
-	case "number":
-		_, err := strconv.ParseFloat(value, 64)
-		if err != nil {
-			return diag.NewErrorDiagnostic(fmt.Sprintf("%q is not a number", value), "")
-		}
-	case "bool":
-		_, err := strconv.ParseBool(value)
-		if err != nil {
-			return diag.NewErrorDiagnostic(fmt.Sprintf("%q is not a bool", value), "")
-		}
-	case "json":
-		var items []string
-		err := json.Unmarshal([]byte(value), &items)
-		if err != nil {
-			return diag.NewErrorDiagnostic(fmt.Sprintf("%q is not a json", value), "")
-		}
-	case "string":
-		// Anything is a string!
-	default:
-		return diag.NewErrorDiagnostic(fmt.Sprintf("%q is not a valid type", typ), "")
-	}
-	return nil
 }

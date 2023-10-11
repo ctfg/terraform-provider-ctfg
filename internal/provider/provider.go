@@ -12,18 +12,12 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 )
 
-// Ensure ScaffoldingProvider satisfies various provider interfaces.
 var _ provider.Provider = &CTFgProvider{}
 
-// CTFgProvider defines the provider implementation.
 type CTFgProvider struct {
-	// version is set to the provider version on release, "dev" when the
-	// provider is built and ran locally, and "test" when running acceptance
-	// testing.
 	version string
 }
 
-// CTFgProviderModel describes the provider data model.
 type CTFgProviderModel struct {
 }
 

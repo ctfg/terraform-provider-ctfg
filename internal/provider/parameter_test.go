@@ -17,6 +17,7 @@ func TestAccParameter(t *testing.T) {
 				resource "ctfg_parameter" "parameter" {
 				  id = "example"
 				  value = "example"
+				  type = "string"
 				}
 				`,
 				Check: resource.ComposeAggregateTestCheckFunc(
